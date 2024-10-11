@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/fetchData.js",
+      "src": "api/my-fetchData/fetchData.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/fetchData",
-      "dest": "/api/fetchData.js"
+      "src": "/api/my-fetchData/fetchData",
+      "dest": "/api/my-fetchData/fetchData.js"
     }
   ]
 }
