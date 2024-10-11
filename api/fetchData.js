@@ -1,35 +1,17 @@
 // api/fetchData.js
 import fetch from 'node-fetch';
 
-// The rest of your function here
-
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { baseUrl, method = 'GET', headers = {}, queryParams = [], body } = req.body;
+  try {
+    // Hardcode the API endpoint to test the function
+    const response = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+    const data = await response.json();
 
-    let url = baseUrl;
-    if (queryParams.length) {
-      const queryString = queryParams.map(({ key, value }) => `${key}=${encodeURIComponent(value)}`).join('&');
-      url += `?${queryString}`;
-    }
-
-    try {
-      const options = {
-        method,
-        headers: { 'Content-Type': 'application/json', ...headers },
-      };
-
-      if (method === 'POST' || method === 'PUT') {
-        options.body = JSON.stringify(body);
-      }
-
-      const response = await fetch(url, options);
-      const data = await response.json();
-      res.status(200).json(data);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch data' });
-    }
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    // Return the fetched data as the response
+    res.status(200).json(data);
+  } catch (error) {
+    // Handle any errors
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 }
+
