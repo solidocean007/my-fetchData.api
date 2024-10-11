@@ -1,5 +1,5 @@
 // // api/fetchData.js
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import Cors from 'cors';
 
 // Initialize the CORS middleware
