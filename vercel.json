@@ -2,8 +2,8 @@
   "version": 2,
   "routes": [
     {
-      "src": "/api/my-fetchData/fetchData",
-      "dest": "/api/my-fetchData/fetchData.js"
+      "src": "/api/fetchData",
+      "dest": "/api/fetchData.js"
     }
   ]
 }
