@@ -30,7 +30,10 @@ export default async function handler(req, res) {
   try {
     // Get the request options from the body of the POST request
     const { baseUrl, method = 'GET', headers = {}, body } = req.body;
-
+    console.log(baseUrl);
+    console.log(method);
+    console.log(headers);
+    console.log(body);
     // Fetch data using the options provided in the request
     const response = await fetch(baseUrl, {
       method,
