@@ -24,16 +24,19 @@ function runMiddleware(req, res, fn) {
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 export default async function handler(req, res) {
+  console.log('Received request body:', req.body); // Log the request body
   // Run the middleware to enable CORS
   await runMiddleware(req, res, cors);
 
   try {
     // Get the request options from the body of the POST request
     const { baseUrl, method = 'GET', headers = {}, body } = req.body;
-    console.log('baseUrl: ',baseUrl);
-    console.log('method: ',method);
-    console.log('headers: ',headers);
-    console.log('body: ',body);
+
+    // Check for a valid URL
+    if (!baseUrl || typeof baseUrl !== 'string') {
+      return res.status(400).json({ error: 'Invalid or missing baseUrl' });
+    }
+   
     // Fetch data using the options provided in the request
     const response = await fetch(baseUrl, {
       method,
