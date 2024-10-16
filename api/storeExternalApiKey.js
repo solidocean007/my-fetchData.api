@@ -1,6 +1,7 @@
-const { db } = require('../../utils/firebase'); // Ensure Firebase is properly configured
+
 const { doc, updateDoc, arrayUnion } = require('firebase/firestore');
 const Cors = require('cors');
+const { db } = require('../firebaseAdmin');
 
 // Initialize the CORS middleware
 const cors = Cors({
