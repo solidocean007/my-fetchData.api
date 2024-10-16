@@ -1,7 +1,5 @@
-
-const { doc, updateDoc, arrayUnion } = require('firebase/firestore');
 const Cors = require('cors');
-const { db } = require('../firebaseAdmin');
+const { db, admin } = require('../firebaseAdmin'); // Import Firebase Admin
 
 // Initialize the CORS middleware
 const cors = Cors({
@@ -37,11 +35,11 @@ module.exports = async (req, res) => {
 
   try {
     // Reference to the document in the 'apiKeys' collection
-    const companyDocRef = doc(db, 'apiKeys', companyId);
+    const companyDocRef = db.collection('apiKeys').doc(companyId);
 
     // Add the external API key to the company's document using arrayUnion
-    await updateDoc(companyDocRef, {
-      externalApiKeys: arrayUnion({
+    await companyDocRef.update({
+      externalApiKeys: admin.firestore.FieldValue.arrayUnion({
         name: externalApiName,
         key: externalApiKey,
       }),
