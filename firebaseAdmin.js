@@ -1,3 +1,4 @@
+// firebaseAdmin.js
 const admin = require('firebase-admin');
 
 // Ensure the admin SDK is initialized only once
