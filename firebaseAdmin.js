@@ -1,4 +1,5 @@
 // firebaseAdmin.js
+console.log('Service Account:', process.env.FIREBASE_SERVICE_ACCOUNT);
 const admin = require('firebase-admin');
 
 // Ensure the admin SDK is initialized only once
