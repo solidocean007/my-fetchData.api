@@ -21,14 +21,13 @@ function runMiddleware(req, res, fn) {
 
 module.exports = async (req, res) => {
   try {
-    // Run CORS middleware
     await runMiddleware(req, res, cors);
 
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    console.log('Request Body:', req.body); // Log the incoming request body
+    console.log('Received Body:', req.body); // Log the body for debugging
 
     const { externalApiName, externalApiKey } = req.body;
 
@@ -37,8 +36,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const companyDocRef = db.collection('apiKeys').doc('default-company-id'); // Adjust doc ID if needed
-
+    const companyDocRef = db.collection('apiKeys').doc('default-company-id');
     await companyDocRef.update({
       externalApiKeys: admin.firestore.FieldValue.arrayUnion({
         name: externalApiName,
@@ -49,8 +47,9 @@ module.exports = async (req, res) => {
     console.log('External API Key added successfully');
     res.status(200).json({ message: 'External API Key added successfully' });
   } catch (error) {
-    console.error('Error adding external API key:', error);
+    console.error('Error:', error);
     res.status(500).json({ error: 'Failed to add external API key', details: error.message });
   }
 };
+
 
