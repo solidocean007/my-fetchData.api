@@ -1,10 +1,10 @@
 const Cors = require('cors');
-const { db, admin } = require('../firebaseAdmin'); // Import Firebase Admin
+const { db, admin } = require('../firebaseAdmin'); // Use Firebase Admin correctly
 
-// Initialize the CORS middleware
+// Initialize CORS middleware
 const cors = Cors({
-  methods: ['POST'], // Allow POST method
-  origin: '*', // Allow requests from any origin (adjust if needed for security)
+  methods: ['POST'],
+  origin: '*', // Adjust origin if needed for security
 });
 
 // Helper method to run the middleware
@@ -20,24 +20,25 @@ function runMiddleware(req, res, fn) {
 }
 
 module.exports = async (req, res) => {
-  // Run CORS middleware
-  await runMiddleware(req, res, cors);
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const { companyId, externalApiName, externalApiKey } = req.body;
-
-  if (!companyId || !externalApiName || !externalApiKey) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
   try {
-    // Reference to the document in the 'apiKeys' collection
-    const companyDocRef = db.collection('apiKeys').doc(companyId);
+    // Run CORS middleware
+    await runMiddleware(req, res, cors);
 
-    // Add the external API key to the company's document using arrayUnion
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    console.log('Request Body:', req.body); // Log the incoming request body
+
+    const { externalApiName, externalApiKey } = req.body;
+
+    if (!externalApiName || !externalApiKey) {
+      console.error('Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const companyDocRef = db.collection('apiKeys').doc('default-company-id'); // Adjust doc ID if needed
+
     await companyDocRef.update({
       externalApiKeys: admin.firestore.FieldValue.arrayUnion({
         name: externalApiName,
@@ -45,9 +46,11 @@ module.exports = async (req, res) => {
       }),
     });
 
-    return res.status(200).json({ message: 'External API Key added successfully' });
+    console.log('External API Key added successfully');
+    res.status(200).json({ message: 'External API Key added successfully' });
   } catch (error) {
     console.error('Error adding external API key:', error);
-    return res.status(500).json({ error: 'Failed to add external API key' });
+    res.status(500).json({ error: 'Failed to add external API key', details: error.message });
   }
 };
+
