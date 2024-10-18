@@ -1,19 +1,33 @@
 // firebaseAdmin.js
-console.log('Service Account:', process.env.FIREBASE_SERVICE_ACCOUNT);
 const admin = require('firebase-admin');
 
-// Ensure the admin SDK is initialized only once
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// Log all environment variables (for debugging purposes)
+console.error('Available ENV Variables:', process.env);
 
+// Check if FIREBASE_SERVICE_ACCOUNT is available
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+if (!serviceAccount) {
+  console.error('FIREBASE_SERVICE_ACCOUNT is not set.');
+  throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is missing.');
+}
+
+let parsedServiceAccount;
+try {
+  parsedServiceAccount = JSON.parse(serviceAccount);
+} catch (error) {
+  console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
+  throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format.');
+}
+
+if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(parsedServiceAccount),
     databaseURL: 'https://retail-sight.firebaseio.com',
   });
 }
 
-// Export the Firestore instance and any other services you need
 const db = admin.firestore();
-const auth = admin.auth(); // Example if you need Firebase Auth later
 
 module.exports = { db, admin };
+
