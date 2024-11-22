@@ -1,4 +1,3 @@
-// api/fetchData.js
 import Cors from 'cors';
 
 // Initialize the CORS middleware
@@ -37,7 +36,7 @@ export default async function handler(req, res) {
     // Get the request options from the body of the POST request
     const { baseUrl, method = 'GET', headers = {}, body } = req.body;
 
-    // Validate the request body
+    // Validate `baseUrl`
     if (!baseUrl || typeof baseUrl !== 'string') {
       return res.status(400).json({ error: 'Invalid or missing baseUrl' });
     }
@@ -52,6 +51,7 @@ export default async function handler(req, res) {
       body: method !== 'GET' ? JSON.stringify(body) : undefined,
     });
 
+    // Handle different content types
     const contentType = response.headers.get('content-type');
     let responseData;
 
@@ -59,36 +59,34 @@ export default async function handler(req, res) {
       responseData = await response.json();
     } else if (contentType?.includes('text')) {
       responseData = await response.text();
+    } else if (response.status === 204 || !contentType) {
+      // Handle empty responses or no content
+      responseData = null;
     } else {
-      responseData = await response.buffer(); // Handle binary data if necessary
+      // Fallback for binary or unknown response types
+      responseData = await response.buffer();
     }
 
+    // Check for upstream errors
     if (!response.ok) {
-      console.error(
-        `Error from upstream API: ${response.status} - ${response.statusText}`
-      );
-      console.error('Response body:', responseData);
-      return res
-        .status(response.status)
-        .json({ error: 'Upstream API error', details: responseData });
+      console.error(`Upstream error: ${response.status} - ${response.statusText}`);
+      return res.status(response.status).json({
+        error: 'Upstream API error',
+        details: responseData || response.statusText,
+      });
     }
 
     // Send the fetched data back as the response
     res.status(200).json(responseData);
   } catch (error) {
-    // Enhanced error logging and handling
     console.error('Error in fetchData handler:', error);
 
-    const isFetchError = error.name === 'FetchError';
-    const statusCode = isFetchError ? 502 : 500;
-    const errorMessage = isFetchError
-      ? 'Failed to fetch from upstream API'
-      : 'Internal Server Error';
-
-    res.status(statusCode).json({
-      error: errorMessage,
+    // Provide more context for the error
+    res.status(500).json({
+      error: 'Failed to fetch data',
       details: error.message || 'Unknown error',
     });
   }
 }
+
 
