@@ -53,6 +53,13 @@ export default async function handler(req, res) {
       body: method !== "GET" ? JSON.stringify(body) : undefined,
     });
 
+    // Log the raw response details
+    console.log("Raw response status:", response.status);
+    console.log(
+      "Raw response headers:",
+      Array.from(response.headers.entries())
+    );
+
     // Handle different content types
     const contentType = response.headers.get("content-type");
     let responseData;
@@ -61,12 +68,14 @@ export default async function handler(req, res) {
       responseData = await response.json();
     } else if (contentType?.includes("text")) {
       responseData = await response.text();
+      console.log("Raw text response:", responseData); // Log raw text response
     } else if (response.status === 204 || !contentType) {
       // Handle empty responses or no content
       responseData = null;
     } else {
       // Fallback for binary or unknown response types
-      responseData = await response.buffer();
+      responseData = await response.arrayBuffer();
+      console.log("Raw binary response:", responseData.toString("base64")); // Log binary as base64
     }
 
     // Check for upstream errors
