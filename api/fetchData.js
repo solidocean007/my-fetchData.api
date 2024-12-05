@@ -63,19 +63,23 @@ export default async function handler(req, res) {
     // Handle different content types
     const contentType = response.headers.get("content-type");
     let responseData;
-
-    if (contentType?.includes("application/json")) {
-      responseData = await response.json();
+    if (response.status === 204 || !response.headers.get("content-length")) {
+      // Handle empty responses (204 No Content or Content-Length: 0)
+      console.log("Empty response body");
+      responseData = null;
+    } else if (contentType?.includes("application/json")) {
+      try {
+        responseData = await response.json();
+      } catch (err) {
+        console.error("Failed to parse JSON response:", err);
+        throw new Error("Invalid JSON response from upstream API");
+      }
     } else if (contentType?.includes("text")) {
       responseData = await response.text();
-      console.log("Raw text response:", responseData); // Log raw text response
-    } else if (response.status === 204 || !contentType) {
-      // Handle empty responses or no content
-      responseData = null;
     } else {
-      // Fallback for binary or unknown response types
-      responseData = await response.arrayBuffer();
-      console.log("Raw binary response:", responseData.toString("base64")); // Log binary as base64
+      // Fallback for unexpected content types
+      const arrayBuffer = await response.arrayBuffer();
+      responseData = Buffer.from(arrayBuffer);
     }
 
     // Check for upstream errors
