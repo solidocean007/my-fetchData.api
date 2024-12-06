@@ -22,7 +22,7 @@ const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 export default async function handler(req, res) {
-  console.log("Received request body:", req.body); // Log the request body
+  console.log("Received request body:", req.body); // Log the incoming request body
 
   // Run the middleware to enable CORS
   try {
@@ -41,12 +41,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid or missing baseUrl" });
     }
 
-    // Parse body if it's stringified JSON
-    const requestBody = typeof body === "string" ? JSON.parse(body) : body;
+    // Log the details of the forwarding request
     console.log(`Forwarding request to: ${baseUrl}`);
     console.log(`Method: ${method}, Headers:`, headers);
 
-    // Fetch data using the options provided in the request
+    // Forward the request to the specified baseUrl
     const response = await fetch(baseUrl, {
       method,
       headers,
@@ -60,48 +59,25 @@ export default async function handler(req, res) {
       Array.from(response.headers.entries())
     );
 
-    // Handle different content types
+    // Log and forward the raw response as is
     const contentType = response.headers.get("content-type");
-    let responseData;
-    if (response.status === 204 || !response.headers.get("content-length")) {
-      // Handle empty responses (204 No Content or Content-Length: 0)
-      console.log("Empty response body");
-      responseData = null;
-    } else if (contentType?.includes("application/json")) {
-      try {
-        responseData = await response.json();
-      } catch (err) {
-        console.error("Failed to parse JSON response:", err);
-        throw new Error("Invalid JSON response from upstream API");
-      }
-    } else if (contentType?.includes("text")) {
-      responseData = await response.text();
-    } else {
-      // Fallback for unexpected content types
-      const arrayBuffer = await response.arrayBuffer();
-      responseData = Buffer.from(arrayBuffer);
-    }
+    const responseData =
+      contentType?.includes("application/json")
+        ? await response.json()
+        : contentType?.includes("text")
+        ? await response.text()
+        : await response.arrayBuffer();
 
-    // Check for upstream errors
-    if (!response.ok) {
-      console.error(
-        `Upstream error: ${response.status} - ${response.statusText}`
-      );
-      return res.status(response.status).json({
-        error: "Upstream API error",
-        details: responseData || response.statusText,
-      });
-    }
+    console.log("Forwarded response body:", responseData);
 
-    // Send the fetched data back as the response
-    res.status(200).json(responseData);
+    // Send the forwarded response back to the client
+    res.status(response.status).json(responseData);
   } catch (error) {
     console.error("Error in fetchData handler:", error);
-
-    // Provide more context for the error
     res.status(500).json({
       error: "Failed to fetch data",
       details: error.message || "Unknown error",
     });
   }
 }
+
