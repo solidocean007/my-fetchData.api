@@ -18,6 +18,69 @@ function runMiddleware(req, res, fn) {
 }
 
 // Use dynamic import for node-fetch since it's an ES module
+// const fetch = (...args) =>
+//   import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+// export default async function handler(req, res) {
+//   console.log("Received request body:", req.body); // Log the incoming request body
+
+//   // Run the middleware to enable CORS
+//   try {
+//     await runMiddleware(req, res, cors);
+//   } catch (corsError) {
+//     console.error("CORS error:", corsError);
+//     return res.status(500).json({ error: "CORS middleware failed" });
+//   }
+
+//   try {
+//     // Get the request options from the body of the POST request
+//     const { baseUrl, method = "GET", headers = {}, body } = req.body;
+
+//     // Validate `baseUrl`
+//     if (!baseUrl || typeof baseUrl !== "string") {
+//       return res.status(400).json({ error: "Invalid or missing baseUrl" });
+//     }
+
+//     // Log the details of the forwarding request
+//     console.log(`Forwarding request to: ${baseUrl}`);
+//     console.log(`Method: ${method}, Headers:`, headers);
+
+//     // Forward the request to the specified baseUrl
+//     const response = await fetch(baseUrl, {
+//       method,
+//       headers,
+//       body: method !== "GET" ? JSON.stringify(body) : undefined,
+//     });
+
+//     // Log the raw response details
+//     console.log("Raw response status:", response.status);
+//     console.log(
+//       "Raw response headers:",
+//       Array.from(response.headers.entries())
+//     );
+
+//     // Log and forward the raw response as is
+//     const contentType = response.headers.get("content-type");
+//     const responseData =
+//       contentType?.includes("application/json")
+//         ? await response.json()
+//         : contentType?.includes("text")
+//         ? await response.text()
+//         : await response.arrayBuffer();
+
+//     console.log("Forwarded response body:", responseData);
+
+//     // Send the forwarded response back to the client
+//     res.status(response.status).json(responseData);
+//   } catch (error) {
+//     console.error("Error in fetchData handler:", error);
+//     res.status(500).json({
+//       error: "Failed to fetch data",
+//       details: error.message || "Unknown error",
+//     });
+//   }
+// }
+
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
@@ -49,29 +112,48 @@ export default async function handler(req, res) {
     const response = await fetch(baseUrl, {
       method,
       headers,
-      body: method !== "GET" ? JSON.stringify(body) : undefined,
+      body: method !== "GET" && body ? JSON.stringify(body) : undefined,
     });
 
-    // Log the raw response details
     console.log("Raw response status:", response.status);
-    console.log(
-      "Raw response headers:",
-      Array.from(response.headers.entries())
-    );
+    console.log("Raw response headers:", Array.from(response.headers.entries()));
 
-    // Log and forward the raw response as is
-    const contentType = response.headers.get("content-type");
-    const responseData =
-      contentType?.includes("application/json")
-        ? await response.json()
-        : contentType?.includes("text")
-        ? await response.text()
-        : await response.arrayBuffer();
+    const contentLength = response.headers.get("content-length");
+    let responseData;
 
-    console.log("Forwarded response body:", responseData);
+    if (!contentLength || parseInt(contentLength) === 0) {
+      // Handle empty response body
+      console.log("Empty response body from backend");
+      responseData = null; // No content to parse
+    } else if (response.headers.get("content-type")?.includes("application/json")) {
+      // Parse JSON response if available
+      try {
+        responseData = await response.json();
+      } catch (error) {
+        console.error("Failed to parse JSON response:", error);
+        return res.status(500).json({
+          error: "Invalid JSON response from upstream API",
+          details: error.message,
+        });
+      }
+    } else {
+      // Handle unexpected content types
+      console.warn("Unexpected content type:", response.headers.get("content-type"));
+      responseData = await response.text(); // Fallback to text
+    }
 
-    // Send the forwarded response back to the client
-    res.status(response.status).json(responseData);
+    if (!response.ok) {
+      console.error(
+        `Upstream error: ${response.status} - ${response.statusText}`
+      );
+      return res.status(response.status).json({
+        error: "Upstream API error",
+        details: responseData || response.statusText,
+      });
+    }
+
+    // Send the successful response back to the client
+    return res.status(response.status).json(responseData || { message: "Success with no content" });
   } catch (error) {
     console.error("Error in fetchData handler:", error);
     res.status(500).json({
@@ -80,4 +162,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
