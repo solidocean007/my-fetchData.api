@@ -1,9 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import applyCors from "../utils/cors";
 import { v4 as uuidv4 } from "uuid";
 import { admin, db } from "../firebaseAdmin";
 
-// Ensure Firebase is initialized
+// Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -11,8 +10,15 @@ if (!admin.apps.length) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("Incoming request to generate collection share token", req.body);
 
-  // ✅ Apply shared CORS handling
-  await applyCors(req, res);
+  // ✅ Set CORS Headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Handle Preflight OPTIONS Request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -29,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const collectionRef = db.collection("collections").doc(collectionId);
     const newToken = uuidv4();
     const newExpiry = admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
     );
 
     await collectionRef.update({

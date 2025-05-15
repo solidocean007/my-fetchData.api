@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import applyCors from "../utils/cors";
 import { admin, db } from "../firebaseAdmin";
 
-// Initialize Firebase if not already done
+// Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -10,8 +9,15 @@ if (!admin.apps.length) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("Incoming request to validate collection access", req.body);
 
-  // ✅ Apply shared CORS handling
-  await applyCors(req, res);
+  // ✅ Set CORS Headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Handle Preflight OPTIONS Request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
