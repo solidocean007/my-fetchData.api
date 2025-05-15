@@ -17,22 +17,43 @@ export default async function handler(req, res) {
   req.on("end", async () => {
     try {
       const { postId, token } = JSON.parse(body);
-      if (!postId || !token) return res.status(400).json({ valid: false, error: "Missing parameters" });
+
+      console.log("Incoming validation request:", { postId, token });
+
+      if (!postId || !token) {
+        console.error("Missing postId or token in request.");
+        return res.status(400).json({ valid: false, error: "Missing parameters" });
+      }
 
       const postRef = admin.firestore().collection("posts").doc(postId);
       const doc = await postRef.get();
-      if (!doc.exists) return res.status(404).json({ valid: false, error: "Post not found" });
+
+      if (!doc.exists) {
+        console.error("Post not found for ID:", postId);
+        return res.status(404).json({ valid: false, error: "Post not found" });
+      }
 
       const post = doc.data();
+      console.log("Fetched post data:", post);
+
+      if (!Array.isArray(post.tokens)) {
+        console.error("No tokens array or invalid structure on post.");
+        return res.status(500).json({ valid: false, error: "Invalid token structure on post" });
+      }
+
       const now = Date.now();
-      const matchingToken = (post.tokens || []).find(t => t.token === token && t.expiry.toMillis() > now);
+      const matchingToken = post.tokens.find(t => t.token === token && t.expiry.toMillis() > now);
 
-      const isValid = Boolean(matchingToken);
+      if (!matchingToken) {
+        console.error("Token not valid or expired.", { postTokens: post.tokens });
+        return res.status(400).json({ valid: false, error: "Invalid or expired token" });
+      }
 
-      return res.status(200).json({ valid: isValid, post: isValid ? post : null });
+      console.log("Token is valid:", matchingToken);
+      return res.status(200).json({ valid: true, post });
 
     } catch (error) {
-      console.error("Error validating post share token:", error);
+      console.error("Unhandled error during validation:", error);
       return res.status(500).json({ error: "Internal server error", details: error.message });
     }
   });
