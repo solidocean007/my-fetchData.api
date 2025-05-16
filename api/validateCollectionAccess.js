@@ -1,26 +1,16 @@
-import { admin, db } from "../firebaseAdmin";
+import { admin } from "../firebaseAdmin";
 
-// Ensure Firebase Admin is initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
 export default async function handler(req, res) {
-  console.log("Incoming request to validate collection access");
-
-  // ✅ Set CORS Headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ Handle Preflight OPTIONS Request
-  if (req.method === "OPTIONS") {
-    return res.writeHead(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.writeHead(405, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "Method Not Allowed" }));
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   let body = "";
   req.on("data", chunk => { body += chunk; });
@@ -29,28 +19,57 @@ export default async function handler(req, res) {
       const { collectionId, userId } = JSON.parse(body);
 
       if (!collectionId || !userId) {
-        console.error("Missing collectionId or userId");
-        return res.writeHead(400, { "Content-Type": "application/json" }).end(JSON.stringify({ valid: false, error: "Missing collectionId or userId" }));
+        return res.status(400).json({ valid: false, error: "Missing collectionId or userId" });
       }
 
-      const collectionRef = db.collection("collections").doc(collectionId);
+      const collectionRef = admin.firestore().collection("collections").doc(collectionId);
       const docSnap = await collectionRef.get();
 
       if (!docSnap.exists) {
-        console.error("Collection not found");
-        return res.writeHead(404, { "Content-Type": "application/json" }).end(JSON.stringify({ valid: false, error: "Collection not found" }));
+        return res.status(404).json({ valid: false, error: "Collection not found" });
       }
 
       const collection = docSnap.data();
-      const isOwnerOrShared =
-        collection?.ownerId === userId ||
-        (collection?.sharedWith || []).includes(userId);
+      const collectionOwnerId = collection.ownerId;
 
-      console.log("Collection access validation result:", isOwnerOrShared);
-      return res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ valid: isOwnerOrShared }));
+      // Fetch the owner's user document to compare companyId
+      const ownerRef = admin.firestore().collection("users").doc(collectionOwnerId);
+      const ownerSnap = await ownerRef.get();
+
+      if (!ownerSnap.exists) {
+        return res.status(404).json({ valid: false, error: "Collection owner not found" });
+      }
+
+      const ownerData = ownerSnap.data();
+      const ownerCompanyId = ownerData?.companyId;
+
+      // Fetch the requesting user's document
+      const userRef = admin.firestore().collection("users").doc(userId);
+      const userSnap = await userRef.get();
+
+      if (!userSnap.exists) {
+        return res.status(404).json({ valid: false, error: "User not found" });
+      }
+
+      const userData = userSnap.data();
+      const userCompanyId = userData?.companyId;
+
+      // ✅ Rule 1: Allow if in the same company
+      if (ownerCompanyId && userCompanyId && ownerCompanyId === userCompanyId) {
+        return res.status(200).json({ valid: true });
+      }
+
+      // ✅ Rule 2: Allow if shareable outside company and user is signed in
+      if (collection.isShareableOutsideCompany) {
+        return res.status(200).json({ valid: true });
+      }
+
+      // ❌ Otherwise, deny access
+      return res.status(403).json({ valid: false, error: "Access denied. Not authorized." });
+
     } catch (error) {
-      console.error("Error in validateCollectionAccess:", error);
-      return res.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "Internal server error", details: error.message }));
+      console.error("Error validating collection access:", error);
+      return res.status(500).json({ valid: false, error: "Internal server error", details: error.message });
     }
   });
 }
