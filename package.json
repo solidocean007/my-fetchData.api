@@ -3,5 +3,9 @@
     "cors": "^2.8.5",
     "firebase-admin": "^12.6.0",
     "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.18",
+    "@types/next": "^8.0.7"
   }
 }
