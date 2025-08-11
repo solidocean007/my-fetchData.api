@@ -106,7 +106,7 @@ module.exports = async (req, res) => {
 
     // Send admin notification via mail collection
     await db.collection('mail').add({
-      to: ['you@displaygram.com'],
+      to: ['support@displaygram.com'],
       message: {
         subject: `New Access Request: ${firstName} ${lastName} (${email})`,
         text: `User requested access.\nCompany: ${companyName}\nType: ${userTypeHint}\nPhone: ${phone}\nNotes: ${notes}\nRequestId: ${reqRef.id}\nCompanyId: ${companyId}`,
