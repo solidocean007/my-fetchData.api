@@ -112,7 +112,6 @@ module.exports = async (req, res) => {
           lastName: lastName.trim(),
           companyId,
           role: "pending",
-          userTypeHint: userTypeHint || "distributor",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
