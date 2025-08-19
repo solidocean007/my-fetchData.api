@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
       return res.status(405).json({ error: "Method Not Allowed" });
 
     const {
-      uid,
+      // uid,
       firstName,
       lastName,
       workEmail,
@@ -27,6 +27,7 @@ module.exports = async (req, res) => {
       userTypeHint,
       phone,
       notes,
+      password,
     } = req.body || {};
 
     // Basic validation
@@ -35,28 +36,9 @@ module.exports = async (req, res) => {
     }
 
     const email = String(workEmail).trim().toLowerCase();
-    let finalUid = uid;
-
-    // Ensure a Firebase Auth user exists (optional if client already created it)
-    if (!finalUid) {
-      try {
-        const user = await admin.auth().getUserByEmail(email);
-        finalUid = user.uid;
-      } catch (e) {
-        if (e.code === "auth/user-not-found") {
-          const user = await admin
-            .auth()
-            .createUser({ email, emailVerified: false, disabled: false });
-          finalUid = user.uid;
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    // Try to find existing company by normalized name
+    // Try to find existing company by normalized name.
+    // If one exists, we DO NOT allow requests — invite-only join.
     const companyNorm = companyName.trim().toLowerCase();
-    let companyId = null;
 
     const q = await db
       .collection("companies")
@@ -65,10 +47,31 @@ module.exports = async (req, res) => {
       .get();
 
     if (!q.empty) {
-      companyId = q.docs[0].id;
-    } else {
-      // create provisional company
-      const ref = await db.collection("companies").add({
+      // Optional: do NOT create user profile or accessRequest.
+      // Just tell the client to ask for an invite.
+      return res.status(409).json({
+        error: "Company already exists on Displaygram. Join is invite-only.",
+        code: "company_exists_requires_invite",
+      });
+    }
+
+    // If we got here, we can create a brand-new provisional company.
+    let companyId = null;
+
+    // (optional) reserve normalizedName to avoid races
+    await db.runTransaction(async (trx) => {
+      const lockRef = db.collection("companyNames").doc(companyNorm);
+      const lockSnap = await trx.get(lockRef);
+      if (lockSnap.exists) {
+        // someone just created it — treat as exists
+        throw Object.assign(new Error("Company reserved"), {
+          status: 409,
+          code: "company_exists_requires_invite",
+        });
+      }
+
+      const companyRef = db.collection("companies").doc();
+      trx.set(companyRef, {
         companyName: companyName.trim(),
         normalizedName: companyNorm,
         companyType: userTypeHint || "distributor",
@@ -80,10 +83,25 @@ module.exports = async (req, res) => {
           maxUsers: (userTypeHint || "distributor") === "distributor" ? 5 : 1,
           maxConnections: 1,
         },
+        accessStatus: "active",
+        primaryContact: {
+          name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          email,
+          phone: phone || "",
+        },
       });
+      trx.set(lockRef, { companyId: companyRef.id });
+      companyId = companyRef.id;
+    });
 
-      companyId = ref.id;
-    }
+    // ✅ Create Auth user
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      emailVerified: false,
+      disabled: false,
+    });
+    const finalUid = userRecord.uid;
 
     // Create access request
     const reqRef = await db.collection("accessRequests").add({
@@ -100,23 +118,23 @@ module.exports = async (req, res) => {
       status: "pending",
     });
 
+    // after add() of accessRequests
+    await reqRef.set({ id: reqRef.id }, { merge: true });
+
     // Upsert user profile doc (role: pending)
-    await db
-      .collection("users")
-      .doc(finalUid)
-      .set(
-        {
-          uid: finalUid,
-          email,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          companyId,
-          role: "pending",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+    await db.collection("users").doc(finalUid).set(
+      {
+        uid: finalUid,
+        email,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        companyId,
+        role: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     // Optional: set custom claims (will be applied next sign-in)
     try {
@@ -157,12 +175,17 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       ok: true,
-      mode: q.empty ? "created" : "matched",
       companyId,
       requestId: reqRef.id,
     });
   } catch (error) {
     console.error("Error in createCompanyOrRequest:", error);
+    if (error?.status === 409) {
+      return res.status(409).json({
+        error: "Company already exists on Displaygram. Join is invite-only.",
+        code: error.code || "company_exists_requires_invite",
+      });
+    }
     return res.status(500).json({ error: "Failed to process request" });
   }
 };
