@@ -75,8 +75,8 @@ module.exports = async (req, res) => {
         companyName: companyName.trim(),
         normalizedName: companyNorm,
         companyType: userTypeHint || "distributor",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: nowIso,
+        lastUpdated: nowIso,
         verified: false,
         tier: "free",
         limits: {
@@ -114,7 +114,7 @@ module.exports = async (req, res) => {
       userTypeHint: userTypeHint || "distributor",
       companyName: companyName.trim(),
       companyId,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: nowIso,
       status: "pending",
     });
 
@@ -130,8 +130,8 @@ module.exports = async (req, res) => {
         lastName: lastName.trim(),
         companyId,
         role: "pending",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
       },
       { merge: true }
     );
